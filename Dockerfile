@@ -7,7 +7,7 @@ RUN CFLAGS="-O0" install-php-extensions pcntl && \
     CFLAGS="-O0 -g0" install-php-extensions bcmath && \
     install-php-extensions zip && \
     install-php-extensions redis && \
-    apk --no-cache add shadow sqlite mysql-client mysql-dev mariadb-connector-c git patch supervisor redis && \
+    apk --no-cache add shadow sqlite mysql-client mysql-dev mariadb-connector-c git patch supervisor redis grep && \
     addgroup -S -g 1000 www && adduser -S -G www -u 1000 www && \
     (getent group redis || addgroup -S redis) && \
     (getent passwd redis || adduser -S -G redis -H -h /data redis)
@@ -35,10 +35,14 @@ RUN composer install --no-cache --no-dev \
     && chmod -R 775 /www \
     && mkdir -p /data \
     && chown redis:redis /data
+
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
     
 ENV ENABLE_WEB=true \
     ENABLE_HORIZON=true \
     ENABLE_REDIS=false 
 
 EXPOSE 7001
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"] 
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+# The original CMD is now executed by the entrypoint script
