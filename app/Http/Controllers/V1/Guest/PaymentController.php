@@ -15,17 +15,52 @@ class PaymentController extends Controller
 {
     public function notify($method, $uuid, Request $request)
     {
+        \Log::info('Payment notification received', [
+            'method' => $method,
+            'uuid' => $uuid,
+            'ip' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'headers' => $request->headers->all()
+        ]);
+
         try {
             $paymentService = new PaymentService($method, null, $uuid);
             $verify = $paymentService->notify($request->input());
-            if (!$verify)
+            
+            if (!$verify) {
+                \Log::warning('Payment verification failed', [
+                    'method' => $method,
+                    'uuid' => $uuid,
+                    'request_data' => $request->all()
+                ]);
                 return $this->fail([422, 'verify error']);
+            }
+            
             if (!$this->handle($verify['trade_no'], $verify['callback_no'])) {
+                \Log::error('Payment handle failed', [
+                    'method' => $method,
+                    'uuid' => $uuid,
+                    'trade_no' => $verify['trade_no'],
+                    'callback_no' => $verify['callback_no']
+                ]);
                 return $this->fail([400, 'handle error']);
             }
+            
+            \Log::info('Payment notification processed successfully', [
+                'method' => $method,
+                'trade_no' => $verify['trade_no'],
+                'callback_no' => $verify['callback_no']
+            ]);
+            
             return (isset($verify['custom_result']) ? $verify['custom_result'] : 'success');
         } catch (\Exception $e) {
-            \Log::error($e);
+            \Log::error('Payment notification error', [
+                'method' => $method,
+                'uuid' => $uuid,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'request_data' => $request->all()
+            ]);
             return $this->fail([500, 'fail']);
         }
     }
